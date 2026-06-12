@@ -1,7 +1,7 @@
 """phantom-quant CLI (P0).
 
   phantom-quant backtest --csv tests/fixtures/sample_2330_1d.csv \
-      --strategy sma_cross --symbol 2330 --cash 1000000 --out report.md
+      --strategy sma_cross --symbol 2330 --short 3 --long 6 --cash 1000000 --out report.md
 
 `fetch` (Shioaji live pull) is P0+ and only works with the optional `broker`
 extra installed; v1 backtests run entirely offline from --csv.
@@ -33,6 +33,9 @@ def main(argv: list[str] | None = None) -> int:
     bt.add_argument("--start", default="0000-00-00")
     bt.add_argument("--end", default="9999-99-99")
     bt.add_argument("--cash", default="1000000")
+    bt.add_argument("--short", type=int, default=5, help="short SMA window")
+    bt.add_argument("--long", type=int, default=20, help="long SMA window")
+    bt.add_argument("--qty", type=int, default=1000, help="shares per order")
     bt.add_argument("--out", required=True, type=Path)
 
     args = parser.parse_args(argv)
@@ -46,7 +49,8 @@ def main(argv: list[str] | None = None) -> int:
         if not bars:
             print("no bars for that symbol/range", file=sys.stderr)
             return 2
-        result = run_backtest(bars, _STRATEGIES[args.strategy](),
+        strategy = _STRATEGIES[args.strategy](short=args.short, long=args.long, qty=args.qty)
+        result = run_backtest(bars, strategy,
                               cash=Decimal(args.cash), cost_fn=costs.trade_cost)
         md = report.to_markdown(result, {"symbol": args.symbol, "strategy": args.strategy})
         args.out.write_text(md, encoding="utf-8")

@@ -9,5 +9,6 @@ data_cache/
 *.parquet
 reports/
 *.md.out
+/report.md
 .DS_Store
 Thumbs.db
