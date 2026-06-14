@@ -1,4 +1,4 @@
-"""OHLCV bar — the atomic unit fed through the backtest/paper/live pipeline."""
+"""OHLCV bar — the atomic unit fed through the backtest engine."""
 from __future__ import annotations
 
 from dataclasses import dataclass

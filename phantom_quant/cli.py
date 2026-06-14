@@ -1,10 +1,10 @@
-"""phantom-quant CLI (P0).
+"""phantom-quant CLI.
 
   phantom-quant backtest --csv tests/fixtures/sample_2330_1d.csv \
       --strategy sma_cross --symbol 2330 --short 3 --long 6 --cash 1000000 --out report.md
 
-`fetch` (Shioaji live pull) is P0+ and only works with the optional `broker`
-extra installed; v1 backtests run entirely offline from --csv.
+`backtest` is the only command and runs entirely offline from --csv. A live
+`fetch` (Shioaji) command and paper/live execution are roadmap items, not built.
 """
 from __future__ import annotations
 

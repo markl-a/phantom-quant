@@ -1,8 +1,9 @@
-"""The strategy contract — the stable interface across backtest / paper / live.
+"""The strategy contract — the interface a strategy implements.
 
-A strategy reacts to one bar at a time. The SAME on_bar code runs in the
-backtest engine (P0), paper trading (P1), and live (P2) — that is the whole
-point of event-driven over vectorized.
+A strategy reacts to one bar at a time via on_bar. Today this runs only in the
+backtest engine. The contract is deliberately execution-agnostic so the same
+on_bar code could later drive paper/live trading, but that wiring is not built
+yet (paper/live are roadmap).
 """
 from __future__ import annotations
 

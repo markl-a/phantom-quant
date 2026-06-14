@@ -1,5 +1,5 @@
 """SMA crossover — a SKELETON strategy for wiring the pipeline. NOT a profitable
-edge; it exists to exercise backtest/paper/live end-to-end.
+edge; it exists to exercise the backtest engine end-to-end.
 """
 from __future__ import annotations
 
