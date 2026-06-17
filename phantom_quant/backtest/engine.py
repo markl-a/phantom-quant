@@ -12,6 +12,7 @@ from ..portfolio import Portfolio
 from ..slippage import NoSlippage, SlippageModel
 from ..strategy import Context, Strategy
 from .. import costs as _costs
+from .. import limit_lock as _limit_lock
 from .execution import FillDecision, FillStatus, decide_fill
 
 __all__ = ["BacktestResult", "run_backtest", "FillStatus"]
@@ -36,6 +37,10 @@ def run_backtest(bars: list[Bar], strategy: Strategy, cash: Decimal,
     # that holds another symbol would KeyError. Single-symbol runs are unchanged.
     last_price: dict[str, float] = {}
     for bar in bars:
+        # prior-session close for THIS symbol (None on its first bar), captured
+        # before last_price is updated to the current bar — it is the reference
+        # the ±10% 漲跌停 band is measured from.
+        prev_close = last_price.get(bar.symbol)
         history.append(bar)
         last_price[bar.symbol] = bar.close
         ctx = Context(cash=pf.cash, positions=dict(pf.positions), history=history)
@@ -49,6 +54,15 @@ def run_backtest(bars: list[Bar], strategy: Strategy, cash: Decimal,
                     f"order symbol {order.symbol!r} != bar symbol {bar.symbol!r}")
             else:
                 decision = decide_fill(order, bar, pf.cash, held, cost_fn)
+                # 台股 ±10% limit-lock applies only to an otherwise-fillable order
+                # (run AFTER structural validation so a malformed order is still
+                # REJECTED, not blocked): a locked limit-up bar has no sellers (a
+                # buy can't fill); a locked limit-down bar has no buyers (a sell
+                # can't fill). Gate it rather than pretend a fill.
+                if decision.status is FillStatus.FILLED:
+                    lock_reason = _limit_lock.lock_blocks(order.side, bar, prev_close)
+                    if lock_reason is not None:
+                        decision = FillDecision(FillStatus.GATED, None, lock_reason)
             if decision.status is FillStatus.FILLED:
                 # Apply slippage to the decided price, then (for a buy) re-check
                 # affordability: slippage can only RAISE a buy price, so a fill

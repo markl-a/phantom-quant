@@ -98,6 +98,39 @@ def test_multi_symbol_equity_marks_all_held_symbols():
     assert res.portfolio.positions == {"AAA": 1000, "BBB": 1000}
 
 
+def test_limit_up_bar_gates_a_buy_through_engine():
+    # bar 1 establishes prev close 100; bar 2 is locked limit-up at 110 (>= +10%),
+    # so a buy emitted on bar 2 must be GATED (no sellers), not filled.
+    bars = [
+        Bar("2026-05-01", "2330", 100.0, 102.0, 99.0, 100.0, 10000),
+        Bar("2026-05-02", "2330", 110.0, 110.0, 110.0, 110.0, 10000),
+    ]
+    strat = _Scripted({"2026-05-02": [Order("2330", "buy", 1000)]})
+    res = run_backtest(bars, strat, cash=Decimal("1000000"), cost_fn=costs.trade_cost)
+    t = [x for x in res.trades if x["ts"] == "2026-05-02"][0]
+    assert t["status"] == FillStatus.GATED
+    assert "limit-up" in t["reason"]
+    assert res.portfolio.positions.get("2330", 0) == 0
+
+
+def test_limit_down_bar_gates_a_sell_through_engine():
+    # acquire a position on bar 1, then bar 2 is locked limit-down at 90 (-10%);
+    # a sell on bar 2 must be GATED (no buyers).
+    bars = [
+        Bar("2026-05-01", "2330", 100.0, 102.0, 99.0, 100.0, 10000),
+        Bar("2026-05-02", "2330", 90.0, 90.0, 90.0, 90.0, 10000),
+    ]
+    strat = _Scripted({
+        "2026-05-01": [Order("2330", "buy", 1000)],
+        "2026-05-02": [Order("2330", "sell", 1000)],
+    })
+    res = run_backtest(bars, strat, cash=Decimal("1000000"), cost_fn=costs.trade_cost)
+    sell = [x for x in res.trades if x["ts"] == "2026-05-02"][0]
+    assert sell["status"] == FillStatus.GATED
+    assert "limit-down" in sell["reason"]
+    assert res.portfolio.positions.get("2330", 0) == 1000  # still held
+
+
 def test_order_for_other_symbol_is_gated():
     bars = [Bar("2026-05-01", "AAA", 50.0, 55.0, 45.0, 50.0, 10000)]
     strat = _Scripted({"2026-05-01": [Order("BBB", "buy", 1000)]})
