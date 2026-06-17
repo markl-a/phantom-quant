@@ -19,11 +19,18 @@
   },
   "metrics": {
     "end_equity": "1024574.0",
+    "ending_cash": "1024574.0",
+    "losses": 0,
     "max_drawdown": "0.0174",
     "num_closed": 1,
+    "num_gated": 0,
+    "num_rejected": 0,
     "num_trades": 2,
+    "realized_pnl": "24574.000",
     "start_equity": "1000000",
-    "total_return": "0.0246"
+    "total_costs": "5426",
+    "total_return": "0.0246",
+    "wins": 1
   },
   "num_bars": 25
 }
