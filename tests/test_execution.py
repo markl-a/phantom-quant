@@ -80,6 +80,43 @@ def test_marketable_limit_buy_fills_at_limit_price():
     assert t["price"] == 101.0
 
 
+# --- a limit MORE generous than the whole bar range fills at an achievable
+#     price, never a price the bar never traded (contract: "a price actually
+#     achievable within the bar"). The fill is clamped into [bar.low, bar.high].
+def test_buy_limit_above_bar_range_fills_clamped_to_bar_high():
+    # buy limit at 200 on a bar that traded only in [99, 102] -> the limit is far
+    # above everything the bar traded. A buy fills at the best (lowest) price it
+    # can; the most adverse price the bar reached is bar.high=102, so the
+    # achievable fill is bar.high (102.0) -- NEVER the un-traded 200.
+    strat = _ScriptedStrategy({
+        "2026-05-01": [Order("2330", "buy", 1000, type="limit", limit_price=200.0)]
+    })
+    res = run_backtest(PRICES, strat, cash=Decimal("1000000"), cost_fn=costs.trade_cost)
+    t = [x for x in res.trades if x["ts"] == "2026-05-01"][0]
+    assert t["status"] == FillStatus.FILLED
+    bar = PRICES[0]
+    assert t["price"] == bar.high == 102.0
+    # the fill price must be a price the bar actually traded at
+    assert bar.low <= t["price"] <= bar.high
+
+
+def test_sell_limit_below_bar_range_fills_clamped_to_bar_low():
+    # need a held position first, then sell with a limit far below the bar range.
+    # sell limit at 1.0 on a bar that traded only in [100, 105] -> the limit is far
+    # below everything; a sell fills at the best (highest) price it can but the
+    # achievable price is clamped to the bar -> bar.low=100.0, NEVER the un-traded 1.0.
+    strat = _ScriptedStrategy({
+        "2026-05-01": [Order("2330", "buy", 1000)],  # acquire a position at close
+        "2026-05-02": [Order("2330", "sell", 1000, type="limit", limit_price=1.0)],
+    })
+    res = run_backtest(PRICES, strat, cash=Decimal("1000000"), cost_fn=costs.trade_cost)
+    t = [x for x in res.trades if x["ts"] == "2026-05-02"][0]
+    assert t["status"] == FillStatus.FILLED
+    bar = PRICES[1]
+    assert t["price"] == bar.low == 100.0
+    assert bar.low <= t["price"] <= bar.high
+
+
 # --- a halted / zero-volume bar cannot fill ---------------------------------
 
 def test_zero_volume_bar_gates_the_fill():

@@ -66,7 +66,10 @@ def decide_fill(order: Order, bar: Bar, cash: Decimal, held: int, cost_fn) -> Fi
     """Decide whether `order` fills on `bar`, and at what price.
 
     No look-ahead: a limit only fills if the bar's traded range reaches it, and
-    fills at the limit price (a price actually achievable within the bar).
+    fills at a price actually achievable within the bar. The fill price is the
+    limit price clamped into [bar.low, bar.high], so a limit that is more
+    generous than the whole bar range (a gap-through) fills at the bar's
+    boundary it traded — never at an un-traded price beyond the range.
     """
     reason = validate_order(order)
     if reason is not None:
@@ -92,7 +95,16 @@ def decide_fill(order: Order, bar: Bar, cash: Decimal, held: int, cost_fn) -> Fi
                 return FillDecision(
                     FillStatus.GATED, None,
                     f"sell limit {lp} above bar high {bar.high}; not reached")
-        price = lp
+        # Fill at a price the bar ACTUALLY traded. The limit price can be more
+        # generous than the whole bar range (a gap-through: a buy limit above
+        # bar.high, or a sell limit below bar.low). Filling at such a limit would
+        # invent a price the bar never traded and violate the "achievable within
+        # the bar" contract. Clamp the fill into [bar.low, bar.high]:
+        #   buy:  fills at min(lp, bar.high) — never pays more than the bar's top
+        #   sell: fills at max(lp, bar.low)  — never sells below the bar's bottom
+        # When lp already lies inside the range, the clamp is a no-op and the
+        # order fills at the limit, exactly as before.
+        price = min(max(lp, bar.low), bar.high)
 
     if order.side == "buy":
         notional = Decimal(str(price)) * Decimal(order.qty)
