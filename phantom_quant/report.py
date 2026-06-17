@@ -24,13 +24,17 @@ def metrics(result: BacktestResult) -> dict:
         dd = (peak - v) / peak if peak else Decimal("0")
         if dd > max_dd:
             max_dd = dd
-    sells = [t for t in result.trades if t["side"] == "sell"]
+    # Only *filled* orders are real trades. Gated/rejected orders are recorded on
+    # the tape (for auditability) but must not inflate trade counts. Trades from
+    # older results without a "status" field are treated as filled (back-compat).
+    filled = [t for t in result.trades if t.get("status", "filled") == "filled"]
+    sells = [t for t in filled if t["side"] == "sell"]
     return {
         "start_equity": start,
         "end_equity": end,
         "total_return": total_return,
         "max_drawdown": _q(max_dd, "0.0001"),
-        "num_trades": len(result.trades),
+        "num_trades": len(filled),
         "num_closed": len(sells),
     }
 

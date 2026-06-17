@@ -11,6 +11,9 @@ from ..bars import Bar
 from ..portfolio import Portfolio
 from ..strategy import Context, Strategy
 from .. import costs as _costs
+from .execution import FillStatus, decide_fill
+
+__all__ = ["BacktestResult", "run_backtest", "FillStatus"]
 
 
 @dataclass
@@ -30,10 +33,18 @@ def run_backtest(bars: list[Bar], strategy: Strategy, cash: Decimal,
         history.append(bar)
         ctx = Context(cash=pf.cash, positions=dict(pf.positions), history=history)
         for order in strategy.on_bar(bar, ctx):
-            price = bar.close if order.limit_price is None else order.limit_price
-            cost = cost_fn(order.side, price, order.qty)
-            pf.apply_fill(order.side, order.symbol, order.qty, price, cost)
+            held = pf.positions.get(order.symbol, 0)
+            decision = decide_fill(order, bar, pf.cash, held, cost_fn)
+            if decision.status is FillStatus.FILLED:
+                price = decision.price
+                cost = cost_fn(order.side, price, order.qty)
+                pf.apply_fill(order.side, order.symbol, order.qty, price, cost)
+            else:
+                # gated / rejected orders never touch the portfolio
+                price = decision.price
+                cost = Decimal("0")
             trades.append({"ts": bar.ts, "symbol": order.symbol, "side": order.side,
-                           "qty": order.qty, "price": price, "cost": cost})
+                           "qty": order.qty, "price": price, "cost": cost,
+                           "status": decision.status, "reason": decision.reason})
         equity_curve.append((bar.ts, pf.equity({bar.symbol: bar.close})))
     return BacktestResult(equity_curve=equity_curve, trades=trades, portfolio=pf)
