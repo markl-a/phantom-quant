@@ -16,6 +16,25 @@ def test_backtest_subcommand_writes_report(tmp_path, capsys):
     assert "report written" in capsys.readouterr().out
 
 
+def test_backtest_artifacts_flag_writes_all_files(tmp_path, capsys):
+    out = tmp_path / "report.md"
+    artdir = tmp_path / "run"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000",
+               "--short", "3", "--long", "6",
+               "--git-sha", "deadbeef", "--version", "9.9.9",
+               "--artifacts", str(artdir), "--out", str(out)])
+    assert rc == 0
+    for name in ("trades.csv", "equity.csv", "run.json", "report.md"):
+        assert (artdir / name).exists(), name
+    import json
+    payload = json.loads((artdir / "run.json").read_text(encoding="utf-8"))
+    assert payload["meta"]["git_sha"] == "deadbeef"
+    assert payload["meta"]["version"] == "9.9.9"
+    assert payload["meta"]["params"] == {"short": 3, "long": 6, "qty": 1000}
+    assert "artifacts written" in capsys.readouterr().out
+
+
 def test_unknown_strategy_errors(tmp_path):
     rc = main(["backtest", "--csv", str(FIX), "--strategy", "nope",
                "--symbol", "2330", "--out", str(tmp_path / "r.md")])

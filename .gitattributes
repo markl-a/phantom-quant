@@ -1,0 +1,11 @@
+# Golden artifact files are byte-compared by tests/test_artifacts.py. They MUST
+# stay LF on every platform or the golden test breaks on a fresh checkout under
+# core.autocrlf=true. Pin them (and the rest of the text tree) to LF.
+* text=auto eol=lf
+
+# Be explicit for the byte-stable golden fixtures (defense in depth).
+tests/golden/** -text eol=lf
+tests/fixtures/*.csv -text eol=lf
+
+# Parquet is binary.
+*.parquet binary

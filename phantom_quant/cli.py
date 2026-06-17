@@ -14,6 +14,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from . import costs, report
+from .artifacts import RunMeta, write_artifacts
 from .backtest.engine import run_backtest
 from .data.provider import CsvProvider
 from .data import store
@@ -38,6 +39,18 @@ def main(argv: list[str] | None = None) -> int:
     bt.add_argument("--long", type=int, default=20, help="long SMA window")
     bt.add_argument("--qty", type=int, default=1000, help="shares per order")
     bt.add_argument("--out", required=True, type=Path)
+    bt.add_argument("--artifacts", type=Path, default=None,
+                    help="directory to write auditable artifacts "
+                         "(trades.csv, equity.csv, run.json, report.md)")
+    # Determinism stamps: passed IN, never computed at runtime (clocks/SHA are
+    # not reproducible). Leave blank for byte-stable golden runs.
+    bt.add_argument("--git-sha", default="unknown",
+                    help="git commit stamp recorded in run.json (caller-supplied)")
+    bt.add_argument("--version", default="unknown",
+                    help="version stamp recorded in run.json (caller-supplied)")
+    bt.add_argument("--generated-at", default="",
+                    help="ISO timestamp recorded in run.json (caller-supplied; "
+                         "left blank keeps artifacts byte-stable)")
 
     ic = sub.add_parser("import-csv",
                         help="load a local CSV into the Parquet cache schema")
@@ -65,6 +78,16 @@ def main(argv: list[str] | None = None) -> int:
         md = report.to_markdown(result, {"symbol": args.symbol, "strategy": args.strategy})
         args.out.write_text(md, encoding="utf-8")
         print(f"report written: {args.out}")
+        if args.artifacts is not None:
+            meta = RunMeta(
+                symbol=args.symbol, strategy=args.strategy, timeframe=args.timeframe,
+                start=args.start, end=args.end, cash=str(args.cash),
+                params={"short": args.short, "long": args.long, "qty": args.qty},
+                bar_count=len(bars), git_sha=args.git_sha,
+                version=args.version, generated_at=args.generated_at)
+            paths = write_artifacts(result, meta, args.artifacts)
+            print(f"artifacts written: {args.artifacts} "
+                  f"({', '.join(p.name for p in paths.values())})")
         return 0
 
     if args.cmd == "import-csv":

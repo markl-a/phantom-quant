@@ -1,0 +1,3 @@
+ts,symbol,side,qty,price,cost,status,reason
+2026-05-09,2330,buy,1000,905.0,1289,filled,ok
+2026-05-26,2330,sell,1000,935.0,4137,filled,ok
