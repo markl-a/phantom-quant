@@ -31,8 +31,29 @@ def test_backtest_artifacts_flag_writes_all_files(tmp_path, capsys):
     payload = json.loads((artdir / "run.json").read_text(encoding="utf-8"))
     assert payload["meta"]["git_sha"] == "deadbeef"
     assert payload["meta"]["version"] == "9.9.9"
-    assert payload["meta"]["params"] == {"short": 3, "long": 6, "qty": 1000}
+    assert payload["meta"]["params"] == {"short": 3, "long": 6, "qty": 1000,
+                                         "slippage_bps": 0.0}
     assert "artifacts written" in capsys.readouterr().out
+
+
+def test_backtest_slippage_flag_changes_fill_price(tmp_path):
+    # With +200bps slippage the buy fills higher and the sell lower, so the
+    # round-trip return is strictly worse than the zero-slippage demo (2.46%).
+    base = tmp_path / "base.md"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000",
+               "--short", "3", "--long", "6", "--out", str(base)])
+    assert rc == 0
+    assert "total return: 2.46%" in base.read_text(encoding="utf-8")
+
+    slipped = tmp_path / "slipped.md"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000",
+               "--short", "3", "--long", "6", "--slippage-bps", "200",
+               "--out", str(slipped)])
+    assert rc == 0
+    # slippage drags the return below the frictionless demo number
+    assert "total return: 2.46%" not in slipped.read_text(encoding="utf-8")
 
 
 def test_unknown_strategy_errors(tmp_path):

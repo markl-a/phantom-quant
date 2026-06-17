@@ -18,6 +18,7 @@ from .artifacts import RunMeta, write_artifacts
 from .backtest.engine import run_backtest
 from .data.provider import CsvProvider
 from .data import store
+from .slippage import BpsSlippage, NoSlippage
 from .strategies.sma_cross import SmaCross
 
 _STRATEGIES = {"sma_cross": SmaCross}
@@ -38,6 +39,9 @@ def main(argv: list[str] | None = None) -> int:
     bt.add_argument("--short", type=int, default=5, help="short SMA window")
     bt.add_argument("--long", type=int, default=20, help="long SMA window")
     bt.add_argument("--qty", type=int, default=1000, help="shares per order")
+    bt.add_argument("--slippage-bps", type=float, default=0.0,
+                    help="adverse slippage in basis points (1 bp = 0.01%%); "
+                         "0 = no slippage (default)")
     bt.add_argument("--out", required=True, type=Path)
     bt.add_argument("--artifacts", type=Path, default=None,
                     help="directory to write auditable artifacts "
@@ -73,8 +77,10 @@ def main(argv: list[str] | None = None) -> int:
             print("no bars for that symbol/range", file=sys.stderr)
             return 2
         strategy = _STRATEGIES[args.strategy](short=args.short, long=args.long, qty=args.qty)
+        slip = NoSlippage() if args.slippage_bps == 0 else BpsSlippage(bps=args.slippage_bps)
         result = run_backtest(bars, strategy,
-                              cash=Decimal(args.cash), cost_fn=costs.trade_cost)
+                              cash=Decimal(args.cash), cost_fn=costs.trade_cost,
+                              slippage=slip)
         md = report.to_markdown(result, {"symbol": args.symbol, "strategy": args.strategy})
         args.out.write_text(md, encoding="utf-8")
         print(f"report written: {args.out}")
@@ -82,7 +88,8 @@ def main(argv: list[str] | None = None) -> int:
             meta = RunMeta(
                 symbol=args.symbol, strategy=args.strategy, timeframe=args.timeframe,
                 start=args.start, end=args.end, cash=str(args.cash),
-                params={"short": args.short, "long": args.long, "qty": args.qty},
+                params={"short": args.short, "long": args.long, "qty": args.qty,
+                        "slippage_bps": args.slippage_bps},
                 bar_count=len(bars), git_sha=args.git_sha,
                 version=args.version, generated_at=args.generated_at)
             paths = write_artifacts(result, meta, args.artifacts)
