@@ -16,6 +16,7 @@ from pathlib import Path
 from . import costs, report
 from .backtest.engine import run_backtest
 from .data.provider import CsvProvider
+from .data import store
 from .strategies.sma_cross import SmaCross
 
 _STRATEGIES = {"sma_cross": SmaCross}
@@ -38,6 +39,15 @@ def main(argv: list[str] | None = None) -> int:
     bt.add_argument("--qty", type=int, default=1000, help="shares per order")
     bt.add_argument("--out", required=True, type=Path)
 
+    ic = sub.add_parser("import-csv",
+                        help="load a local CSV into the Parquet cache schema")
+    ic.add_argument("--csv", required=True, type=Path)
+    ic.add_argument("--symbol", required=True)
+    ic.add_argument("--timeframe", default="1d")
+    ic.add_argument("--start", default="0000-00-00")
+    ic.add_argument("--end", default="9999-99-99")
+    ic.add_argument("--out", required=True, type=Path)
+
     args = parser.parse_args(argv)
 
     if args.cmd == "backtest":
@@ -55,6 +65,16 @@ def main(argv: list[str] | None = None) -> int:
         md = report.to_markdown(result, {"symbol": args.symbol, "strategy": args.strategy})
         args.out.write_text(md, encoding="utf-8")
         print(f"report written: {args.out}")
+        return 0
+
+    if args.cmd == "import-csv":
+        bars = CsvProvider(args.csv).get_bars(args.symbol, args.timeframe,
+                                              args.start, args.end)
+        if not bars:
+            print(f"no rows for symbol {args.symbol!r} in {args.csv}", file=sys.stderr)
+            return 2
+        store.save_bars(bars, args.out)
+        print(f"imported {len(bars)} bars for {args.symbol} -> {args.out}")
         return 0
     return 1
 
