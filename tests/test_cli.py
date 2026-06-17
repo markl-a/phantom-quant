@@ -16,6 +16,88 @@ def test_backtest_subcommand_writes_report(tmp_path, capsys):
     assert "report written" in capsys.readouterr().out
 
 
+def test_backtest_artifacts_flag_writes_all_files(tmp_path, capsys):
+    out = tmp_path / "report.md"
+    artdir = tmp_path / "run"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000",
+               "--short", "3", "--long", "6",
+               "--git-sha", "deadbeef", "--version", "9.9.9",
+               "--artifacts", str(artdir), "--out", str(out)])
+    assert rc == 0
+    for name in ("trades.csv", "equity.csv", "run.json", "report.md"):
+        assert (artdir / name).exists(), name
+    import json
+    payload = json.loads((artdir / "run.json").read_text(encoding="utf-8"))
+    assert payload["meta"]["git_sha"] == "deadbeef"
+    assert payload["meta"]["version"] == "9.9.9"
+    assert payload["meta"]["params"] == {"short": 3, "long": 6, "qty": 1000,
+                                         "slippage_bps": 0.0}
+    assert "artifacts written" in capsys.readouterr().out
+
+
+def test_backtest_slippage_flag_changes_fill_price(tmp_path):
+    # With +200bps slippage the buy fills higher and the sell lower, so the
+    # round-trip return is strictly worse than the zero-slippage demo (2.46%).
+    base = tmp_path / "base.md"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000",
+               "--short", "3", "--long", "6", "--out", str(base)])
+    assert rc == 0
+    assert "total return: 2.46%" in base.read_text(encoding="utf-8")
+
+    slipped = tmp_path / "slipped.md"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000",
+               "--short", "3", "--long", "6", "--slippage-bps", "200",
+               "--out", str(slipped)])
+    assert rc == 0
+    # slippage drags the return below the frictionless demo number
+    assert "total return: 2.46%" not in slipped.read_text(encoding="utf-8")
+
+
+BAD_FIX = Path(__file__).parent / "fixtures" / "bad_high_lt_low.csv"
+
+
+def test_backtest_rejects_malformed_bar_data_by_default(tmp_path, capsys):
+    out = tmp_path / "r.md"
+    rc = main(["backtest", "--csv", str(BAD_FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000", "--out", str(out)])
+    assert rc == 2
+    assert "failed validation" in capsys.readouterr().err
+    assert not out.exists()  # no report written on bad data
+
+
+def test_backtest_no_validate_flag_skips_validation(tmp_path):
+    # --no-validate runs the engine even on structurally bad data (escape hatch).
+    out = tmp_path / "r.md"
+    rc = main(["backtest", "--csv", str(BAD_FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000",
+               "--no-validate", "--out", str(out)])
+    assert rc == 0
+    assert out.exists()
+
+
+def test_backtest_cache_flag_writes_and_reuses_parquet(tmp_path):
+    cache = tmp_path / "cache"
+    out1 = tmp_path / "r1.md"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000", "--short", "3", "--long", "6",
+               "--cache", str(cache), "--out", str(out1)])
+    assert rc == 0
+    parquets = list(cache.glob("*.parquet"))
+    assert len(parquets) == 1  # one cache file for this symbol/timeframe/range
+
+    # second run hits the cache and produces an identical report
+    out2 = tmp_path / "r2.md"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000", "--short", "3", "--long", "6",
+               "--cache", str(cache), "--out", str(out2)])
+    assert rc == 0
+    assert out1.read_text(encoding="utf-8") == out2.read_text(encoding="utf-8")
+    assert len(list(cache.glob("*.parquet"))) == 1  # no new cache file
+
+
 def test_unknown_strategy_errors(tmp_path):
     rc = main(["backtest", "--csv", str(FIX), "--strategy", "nope",
                "--symbol", "2330", "--out", str(tmp_path / "r.md")])
