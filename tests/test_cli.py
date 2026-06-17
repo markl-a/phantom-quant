@@ -56,6 +56,28 @@ def test_backtest_slippage_flag_changes_fill_price(tmp_path):
     assert "total return: 2.46%" not in slipped.read_text(encoding="utf-8")
 
 
+BAD_FIX = Path(__file__).parent / "fixtures" / "bad_high_lt_low.csv"
+
+
+def test_backtest_rejects_malformed_bar_data_by_default(tmp_path, capsys):
+    out = tmp_path / "r.md"
+    rc = main(["backtest", "--csv", str(BAD_FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000", "--out", str(out)])
+    assert rc == 2
+    assert "failed validation" in capsys.readouterr().err
+    assert not out.exists()  # no report written on bad data
+
+
+def test_backtest_no_validate_flag_skips_validation(tmp_path):
+    # --no-validate runs the engine even on structurally bad data (escape hatch).
+    out = tmp_path / "r.md"
+    rc = main(["backtest", "--csv", str(BAD_FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000",
+               "--no-validate", "--out", str(out)])
+    assert rc == 0
+    assert out.exists()
+
+
 def test_unknown_strategy_errors(tmp_path):
     rc = main(["backtest", "--csv", str(FIX), "--strategy", "nope",
                "--symbol", "2330", "--out", str(tmp_path / "r.md")])

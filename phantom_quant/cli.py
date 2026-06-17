@@ -20,6 +20,7 @@ from .data.provider import CsvProvider
 from .data import store
 from .slippage import BpsSlippage, NoSlippage
 from .strategies.sma_cross import SmaCross
+from .validation import BarValidationError, validate_bars
 
 _STRATEGIES = {"sma_cross": SmaCross}
 
@@ -42,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     bt.add_argument("--slippage-bps", type=float, default=0.0,
                     help="adverse slippage in basis points (1 bp = 0.01%%); "
                          "0 = no slippage (default)")
+    bt.add_argument("--no-validate", action="store_true",
+                    help="skip structural bar validation (OHLC sanity, ordering, "
+                         "duplicates); validation is ON by default")
     bt.add_argument("--out", required=True, type=Path)
     bt.add_argument("--artifacts", type=Path, default=None,
                     help="directory to write auditable artifacts "
@@ -76,6 +80,12 @@ def main(argv: list[str] | None = None) -> int:
         if not bars:
             print("no bars for that symbol/range", file=sys.stderr)
             return 2
+        if not args.no_validate:
+            try:
+                validate_bars(bars, symbol=args.symbol)
+            except BarValidationError as e:
+                print(f"bar data failed validation: {e}", file=sys.stderr)
+                return 2
         strategy = _STRATEGIES[args.strategy](short=args.short, long=args.long, qty=args.qty)
         slip = NoSlippage() if args.slippage_bps == 0 else BpsSlippage(bps=args.slippage_bps)
         result = run_backtest(bars, strategy,
