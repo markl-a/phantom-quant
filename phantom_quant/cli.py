@@ -16,7 +16,7 @@ from pathlib import Path
 from . import costs, report
 from .artifacts import RunMeta, write_artifacts
 from .backtest.engine import run_backtest
-from .data.provider import CsvProvider
+from .data.provider import CachedProvider, CsvProvider
 from .data import store
 from .slippage import BpsSlippage, NoSlippage
 from .strategies.sma_cross import SmaCross
@@ -46,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     bt.add_argument("--no-validate", action="store_true",
                     help="skip structural bar validation (OHLC sanity, ordering, "
                          "duplicates); validation is ON by default")
+    bt.add_argument("--cache", type=Path, default=None,
+                    help="Parquet cache directory; bars for this "
+                         "symbol/timeframe/range are fetched once then reused")
     bt.add_argument("--out", required=True, type=Path)
     bt.add_argument("--artifacts", type=Path, default=None,
                     help="directory to write auditable artifacts "
@@ -76,7 +79,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"unknown strategy: {args.strategy}. choices: {sorted(_STRATEGIES)}",
                   file=sys.stderr)
             return 2
-        bars = CsvProvider(args.csv).get_bars(args.symbol, args.timeframe, args.start, args.end)
+        provider = CsvProvider(args.csv)
+        if args.cache is not None:
+            provider = CachedProvider(provider, args.cache)
+        bars = provider.get_bars(args.symbol, args.timeframe, args.start, args.end)
         if not bars:
             print("no bars for that symbol/range", file=sys.stderr)
             return 2

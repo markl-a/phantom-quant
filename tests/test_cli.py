@@ -78,6 +78,26 @@ def test_backtest_no_validate_flag_skips_validation(tmp_path):
     assert out.exists()
 
 
+def test_backtest_cache_flag_writes_and_reuses_parquet(tmp_path):
+    cache = tmp_path / "cache"
+    out1 = tmp_path / "r1.md"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000", "--short", "3", "--long", "6",
+               "--cache", str(cache), "--out", str(out1)])
+    assert rc == 0
+    parquets = list(cache.glob("*.parquet"))
+    assert len(parquets) == 1  # one cache file for this symbol/timeframe/range
+
+    # second run hits the cache and produces an identical report
+    out2 = tmp_path / "r2.md"
+    rc = main(["backtest", "--csv", str(FIX), "--strategy", "sma_cross",
+               "--symbol", "2330", "--cash", "1000000", "--short", "3", "--long", "6",
+               "--cache", str(cache), "--out", str(out2)])
+    assert rc == 0
+    assert out1.read_text(encoding="utf-8") == out2.read_text(encoding="utf-8")
+    assert len(list(cache.glob("*.parquet"))) == 1  # no new cache file
+
+
 def test_unknown_strategy_errors(tmp_path):
     rc = main(["backtest", "--csv", str(FIX), "--strategy", "nope",
                "--symbol", "2330", "--out", str(tmp_path / "r.md")])
