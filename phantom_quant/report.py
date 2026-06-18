@@ -3,13 +3,23 @@ equity curve / trades — independently re-computable (adversarially auditable).
 """
 from __future__ import annotations
 
+import statistics
+from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
+from math import sqrt
 
 from .backtest.engine import BacktestResult
 
 
 def _q(x: Decimal, places: str = "0.0001") -> Decimal:
     return x.quantize(Decimal(places), ROUND_HALF_UP)
+
+
+def _parse_equity_ts(s: str) -> datetime:
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        return datetime.combine(date.fromisoformat(s), datetime.min.time())
 
 
 def _win_loss(filled: list[dict]) -> tuple[int, int]:
@@ -53,7 +63,7 @@ def _win_loss(filled: list[dict]) -> tuple[int, int]:
     return wins, losses
 
 
-def metrics(result: BacktestResult) -> dict:
+def metrics(result: BacktestResult, *, risk_free: float = 0.0, periods_per_year: int = 252) -> dict:
     curve = [v for _, v in result.equity_curve]
     start, end = curve[0], curve[-1]
     total_return = _q(end / start - 1, "0.0001")
@@ -80,6 +90,43 @@ def metrics(result: BacktestResult) -> dict:
     # _win_loss): an approximation off the tape, not realized PnL.
     wins, losses = _win_loss(filled)
 
+    # Risk metrics:
+    # - annualized Sharpe = mean(excess returns) / pstdev(rets) * sqrt(ppy)
+    # - CAGR = (end / start) ** (1 / years) - 1
+    # - annualized volatility = pstdev(rets) * sqrt(ppy)
+    # risk_free defaults to 0 per annum and is converted to a per-period rate.
+    # periods_per_year defaults to 252, Taiwan daily trading days. Edge cases are
+    # graceful: <2 returns -> None; zero variance -> Sharpe None, vol 0.0;
+    # unparseable dates -> fall back to bar-count / ppy years.
+    rets = [float(curve[i]) / float(curve[i - 1]) - 1.0 for i in range(1, len(curve))]
+
+    if len(rets) < 2:
+        ann_vol = None
+        sharpe = None
+    else:
+        sd = statistics.pstdev(rets)
+        ann_vol = round(sd * sqrt(periods_per_year), 6)
+        if sd == 0:
+            sharpe = None
+        else:
+            rf_per = risk_free / periods_per_year
+            excess_mean = statistics.mean(r - rf_per for r in rets)
+            sharpe = round((excess_mean / sd) * sqrt(periods_per_year), 6)
+
+    cagr = None
+    if len(curve) >= 2:
+        ts_first = result.equity_curve[0][0]
+        ts_last = result.equity_curve[-1][0]
+        years = None
+        try:
+            years = (_parse_equity_ts(ts_last) - _parse_equity_ts(ts_first)).total_seconds() / (365.25 * 24 * 3600)
+        except ValueError:
+            years = None
+        if not years or years <= 0:
+            years = len(rets) / periods_per_year if rets else None
+        if years and years > 0:
+            cagr = round((float(end) / float(start)) ** (1.0 / years) - 1.0, 6)
+
     return {
         "start_equity": start,
         "end_equity": end,
@@ -94,6 +141,9 @@ def metrics(result: BacktestResult) -> dict:
         "num_rejected": num_rejected,
         "wins": wins,
         "losses": losses,
+        "sharpe": sharpe,
+        "cagr": cagr,
+        "annualized_volatility": ann_vol,
     }
 
 
@@ -107,6 +157,7 @@ def to_markdown(result: BacktestResult, meta: dict) -> str:
         f"- start equity: {m['start_equity']}  →  end equity: {m['end_equity']}",
         f"- **total return: {pct(m['total_return'])}**",
         f"- max drawdown: {pct(m['max_drawdown'])}",
+        f"- sharpe: {m['sharpe']}  ·  CAGR: {pct(m['cagr']) if m['cagr'] is not None else 'n/a'}  ·  ann. vol: {m['annualized_volatility']}",
         f"- trades: {m['num_trades']} (closed: {m['num_closed']})",
         f"- realized PnL: {m['realized_pnl']}  ·  costs paid: {m['total_costs']}  ·  ending cash: {m['ending_cash']}",
         "",
