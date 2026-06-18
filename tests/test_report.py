@@ -108,3 +108,82 @@ def test_gated_and_rejected_are_counted_not_filled():
     assert m["num_trades"] == 0  # neither is a filled trade
     assert m["num_gated"] == 1 and m["num_rejected"] == 1
     assert m["total_costs"] == Decimal("0")
+
+
+def test_risk_metrics_hand_computed():
+    import math
+    import statistics
+    from datetime import date
+
+    import pytest
+
+    dates = ["2020-01-01", "2020-01-02", "2020-01-03", "2020-01-04"]
+    values = [
+        Decimal("1000000"),
+        Decimal("1010000"),
+        Decimal("999900"),
+        Decimal("1020000"),
+    ]
+    curve = list(zip(dates, values))
+    result = BacktestResult(curve, [], Portfolio(Decimal("1020000")))
+
+    rets = [float(values[i]) / float(values[i - 1]) - 1.0 for i in range(1, len(values))]
+    sd = statistics.pstdev(rets)
+    expected_vol = sd * math.sqrt(252)
+    expected_sharpe = (statistics.mean(rets) / sd) * math.sqrt(252)
+    elapsed_days = (date.fromisoformat(dates[-1]) - date.fromisoformat(dates[0])).days
+    years = elapsed_days / 365.25
+    expected_cagr = (float(values[-1]) / float(values[0])) ** (1.0 / years) - 1.0
+
+    m = report.metrics(result, risk_free=0.0, periods_per_year=252)
+
+    assert m["annualized_volatility"] == pytest.approx(round(expected_vol, 6), rel=1e-9)
+    assert m["sharpe"] == pytest.approx(round(expected_sharpe, 6), rel=1e-9)
+    assert m["cagr"] == pytest.approx(round(expected_cagr, 6), rel=1e-9)
+
+
+def test_risk_metrics_graceful_edge():
+    flat_curve = [
+        ("d1", Decimal("1000000")),
+        ("d2", Decimal("1000000")),
+        ("d3", Decimal("1000000")),
+    ]
+    flat = report.metrics(BacktestResult(flat_curve, [], Portfolio(Decimal("1000000"))))
+    assert flat["annualized_volatility"] == 0.0
+    assert flat["sharpe"] is None
+
+    single_curve = [("d1", Decimal("1000000"))]
+    single = report.metrics(BacktestResult(single_curve, [], Portfolio(Decimal("1000000"))))
+    assert single["annualized_volatility"] is None
+    assert single["sharpe"] is None
+    assert single["cagr"] is None
+
+
+def test_risk_metrics_in_artifacts(tmp_path):
+    import json
+
+    from phantom_quant.artifacts import RunMeta, write_artifacts
+
+    curve = [
+        ("2020-01-01", Decimal("1000000")),
+        ("2020-01-02", Decimal("1010000")),
+        ("2020-01-03", Decimal("999900")),
+        ("2020-01-04", Decimal("1020000")),
+    ]
+    result = BacktestResult(curve, [], Portfolio(Decimal("1020000")))
+    meta = RunMeta(
+        symbol="2330",
+        strategy="known_curve",
+        cash="1000000",
+        bar_count=len(curve),
+        git_sha="TEST_SHA",
+        version="TEST_VER",
+        generated_at="2020-01-04T00:00:00Z",
+    )
+
+    paths = write_artifacts(result, meta, tmp_path)
+    payload = json.loads(paths["run"].read_text(encoding="utf-8"))
+    report_text = paths["report"].read_text(encoding="utf-8")
+
+    assert "sharpe" in payload["metrics"]
+    assert "sharpe" in report_text
