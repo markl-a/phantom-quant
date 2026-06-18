@@ -1,8 +1,11 @@
 # phantom-quant
 
-> 台股 backtest → paper → live trading engine for the phantom-mesh ecosystem. **v1 = P0: data + backtest only** (no orders, no real money).
+> 台股 backtest → paper → live trading engine for the phantom-mesh ecosystem. Offline backtesting with auditable, re-derivable numbers — no broker, no real money.
 
-Backtests run **fully offline** from cached bar data — no broker, no network. See the design spec (goal_plan/docs/34) and plan (goal_plan/docs/35).
+Backtests run **fully offline** from cached bar data — no broker, no network.
+
+- **Status** (what's shipped / planned): see [ROADMAP.md](ROADMAP.md).
+- **All docs**: see [docs/INDEX.md](docs/INDEX.md).
 
 ## Quickstart (Windows / PowerShell)
 ```powershell
