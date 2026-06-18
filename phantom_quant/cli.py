@@ -21,8 +21,18 @@ from .data import store
 from .slippage import BpsSlippage, NoSlippage
 from .strategies.sma_cross import SmaCross
 from .validation import BarValidationError, validate_bars
+from .paper import run_paper
+from .registry import StrategyError, load_strategy
 
 _STRATEGIES = {"sma_cross": SmaCross}
+
+
+def _resolve_strategy(args):
+    try:
+        return load_strategy(args.strategy, short=args.short, long=args.long, qty=args.qty)
+    except StrategyError as exc:
+        print(str(exc), file=sys.stderr)
+        return None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -63,6 +73,28 @@ def main(argv: list[str] | None = None) -> int:
                     help="ISO timestamp recorded in run.json (caller-supplied; "
                          "left blank keeps artifacts byte-stable)")
 
+    pp = sub.add_parser("paper", help="run simulated paper trading from a CSV")
+    pp.add_argument("--csv", required=True, type=Path)
+    pp.add_argument("--strategy", required=True)
+    pp.add_argument("--symbol", required=True)
+    pp.add_argument("--timeframe", default="1d")
+    pp.add_argument("--start", default="0000-00-00")
+    pp.add_argument("--end", default="9999-99-99")
+    pp.add_argument("--cash", default="1000000")
+    pp.add_argument("--short", type=int, default=5, help="short SMA window")
+    pp.add_argument("--long", type=int, default=20, help="long SMA window")
+    pp.add_argument("--qty", type=int, default=1000, help="shares per order")
+    pp.add_argument("--slippage-bps", type=float, default=0.0,
+                    help="adverse slippage in basis points (1 bp = 0.01%%); "
+                         "0 = no slippage (default)")
+    pp.add_argument("--no-validate", action="store_true",
+                    help="skip structural bar validation (OHLC sanity, ordering, "
+                         "duplicates); validation is ON by default")
+    pp.add_argument("--cache", type=Path, default=None,
+                    help="Parquet cache directory; bars for this "
+                         "symbol/timeframe/range are fetched once then reused")
+    pp.add_argument("--out", required=True, type=Path)
+
     ic = sub.add_parser("import-csv",
                         help="load a local CSV into the Parquet cache schema")
     ic.add_argument("--csv", required=True, type=Path)
@@ -75,9 +107,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.cmd == "backtest":
-        if args.strategy not in _STRATEGIES:
-            print(f"unknown strategy: {args.strategy}. choices: {sorted(_STRATEGIES)}",
-                  file=sys.stderr)
+        # Resolve strategy first (registry path) so an unknown strategy fails
+        # before any CSV is read -- preserving the original backtest ordering.
+        strategy = _resolve_strategy(args)
+        if strategy is None:
             return 2
         provider = CsvProvider(args.csv)
         if args.cache is not None:
@@ -92,7 +125,6 @@ def main(argv: list[str] | None = None) -> int:
             except BarValidationError as e:
                 print(f"bar data failed validation: {e}", file=sys.stderr)
                 return 2
-        strategy = _STRATEGIES[args.strategy](short=args.short, long=args.long, qty=args.qty)
         slip = NoSlippage() if args.slippage_bps == 0 else BpsSlippage(bps=args.slippage_bps)
         result = run_backtest(bars, strategy,
                               cash=Decimal(args.cash), cost_fn=costs.trade_cost,
@@ -111,6 +143,31 @@ def main(argv: list[str] | None = None) -> int:
             paths = write_artifacts(result, meta, args.artifacts)
             print(f"artifacts written: {args.artifacts} "
                   f"({', '.join(p.name for p in paths.values())})")
+        return 0
+
+    if args.cmd == "paper":
+        strategy = _resolve_strategy(args)
+        if strategy is None:
+            return 2
+        provider = CsvProvider(args.csv)
+        if args.cache is not None:
+            provider = CachedProvider(provider, args.cache)
+        bars = provider.get_bars(args.symbol, args.timeframe, args.start, args.end)
+        if not bars:
+            print("no bars for that symbol/range", file=sys.stderr)
+            return 2
+        if not args.no_validate:
+            try:
+                validate_bars(bars, symbol=args.symbol)
+            except BarValidationError as e:
+                print(f"bar data failed validation: {e}", file=sys.stderr)
+                return 2
+        slip = NoSlippage() if args.slippage_bps == 0 else BpsSlippage(bps=args.slippage_bps)
+        result = run_paper(bars, strategy, cash=Decimal(args.cash),
+                           cost_fn=costs.trade_cost, slippage=slip)
+        md = report.to_markdown(result, {"symbol": args.symbol, "strategy": args.strategy})
+        args.out.write_text(md, encoding="utf-8")
+        print(f"report written: {args.out}")
         return 0
 
     if args.cmd == "import-csv":

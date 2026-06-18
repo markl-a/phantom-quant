@@ -1,8 +1,10 @@
 """Loadable strategy registry.
 
-DESIGN: This registry is ADDITIVE. It wraps the builtin strategy dict pattern;
-builtins self-register into a default registry at import, and CLI behavior is
-unchanged because ``phantom_quant.cli`` still owns its hardcoded mapping.
+DESIGN: builtins self-register into a ``default_registry`` at import. The CLI
+resolves ``--strategy`` through ``load_strategy`` against this registry, so a
+strategy registered here (and not in ``phantom_quant.cli._STRATEGIES``) is
+reachable from the command line. ``cli._STRATEGIES`` is retained only as a
+compatibility alias; it is no longer the selection path.
 """
 from __future__ import annotations
 
