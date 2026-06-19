@@ -1,3 +1,5 @@
+> ARCHIVED 2026-06-19 — 內容已併入 docs/phantom-quant.md;此為歷史版本。
+
 # Roadmap
 
 > **This file is the single source of truth for project status.** Other docs (README, `docs/INDEX.md`) link here instead of keeping their own status lists.

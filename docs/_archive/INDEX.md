@@ -1,3 +1,5 @@
+> ARCHIVED 2026-06-19 — 內容已併入 docs/phantom-quant.md;此為歷史版本。
+
 # Documentation index
 
 > Single navigation entry for phantom-quant docs. For **project status** (what's shipped / in progress / planned), see [ROADMAP.md](../ROADMAP.md) — that is the one status source of truth.
