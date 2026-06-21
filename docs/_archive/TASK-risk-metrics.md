@@ -2,10 +2,10 @@
 
 # TASK: phantom-quant — risk-adjusted performance metrics (Sharpe + CAGR + annualized volatility) in report.metrics()
 
-Repo: D:\Projects\phantom-quant (z13). Python. Default branch: master. Branch: sat/quant-risk-metrics (off origin/master). Scouted @ac537ff.
+Repo: phantom-quant (orchestrator node (Win)). Python. Default branch: master. Branch: sat/quant-risk-metrics (off origin/master). Scouted @ac537ff.
 
 ## YOU ORCHESTRATE ONLY — do NOT write the code yourself. Minimize your own tokens.
-- Code: `D:\Projects\phantom-mesh-private\.claude\skills\local-ai\ask.sh codex "implement <one fn/edit + a failing test>"` (one file/call, lint after).
+- Code: `<phantom-mesh>/.claude/skills/local-ai/ask.sh codex "implement <one fn/edit + a failing test>"` (one file/call, lint after).
 - Reading: `... ask.sh opencode "read phantom_quant/report.py metrics() + how the equity curve is built + the run.json/report.md artifact writers"`. 2nd-op: `... ask.sh agy "<q>"`.
 - Run tests yourself; gate via `ask.sh all`; commit. Write code yourself ONLY if codex flakes twice.
 
@@ -43,7 +43,7 @@ real formula, not a stub); (2) asserts the metrics appear in the emitted run.jso
   do NOT change the engine/backtest. HONEST-BAIL: if the bar cadence/periods-per-year can't be inferred, take it as a documented param default (don't fake).
 
 ## Self-gate (trio) — need >=2 distinct-AI LGTM
-`D:\Projects\phantom-mesh-private\.claude\skills\local-ai\ask.sh all "Review sat/quant-risk-metrics via 'git diff origin/master..HEAD'. Confirm (1) metrics() now computes sharpe + cagr + annualized_volatility from the EXISTING equity curve (correct annualized formulas, stdlib statistics, risk_free/periods documented, graceful on <2 returns / zero variance); (2) a test asserts these equal HAND-COMPUTED values for a known curve (real formula, not a stub) AND that they appear in the emitted run.json + report.md artifacts; (3) ADDITIVE, no deleted tests (--diff-filter=D), all 113+ prior green, lint clean, engine/backtest unchanged. ANTI-FAKE-GREEN: reject if the metrics are hard-coded/wrong or not surfaced in the real artifacts. Verdict LGTM or FIX_FIRST."`
+`<phantom-mesh>/.claude/skills/local-ai/ask.sh all "Review sat/quant-risk-metrics via 'git diff origin/master..HEAD'. Confirm (1) metrics() now computes sharpe + cagr + annualized_volatility from the EXISTING equity curve (correct annualized formulas, stdlib statistics, risk_free/periods documented, graceful on <2 returns / zero variance); (2) a test asserts these equal HAND-COMPUTED values for a known curve (real formula, not a stub) AND that they appear in the emitted run.json + report.md artifacts; (3) ADDITIVE, no deleted tests (--diff-filter=D), all 113+ prior green, lint clean, engine/backtest unchanged. ANTI-FAKE-GREEN: reject if the metrics are hard-coded/wrong or not surfaced in the real artifacts. Verdict LGTM or FIX_FIRST."`
 
 ## Finish
 `git push -u origin sat/quant-risk-metrics` (push only, do NOT merge). Print: the new metrics + formulas, the test output (hand-computed match + artifact presence), gate verdicts.

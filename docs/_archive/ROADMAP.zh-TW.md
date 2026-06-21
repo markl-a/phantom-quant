@@ -73,23 +73,23 @@ flowchart LR
 
 | 目標 | 具體項 | 在哪做 | 風險 / 前置 |
 |---|---|---|---|
-| 加策略廣度 | 經既有 `StrategyRegistry` 加 **2–3 個參考策略**(動量／突破、均值回歸） | z13 編排;codex/claude 寫,codex+agy 對讀審 | 低。seam 已就緒,純加法 |
-| 補風險指標 | 既有 Sharpe/CAGR/vol 之上加 **Sortino / Calmar / 最大回撤期間**(同由 equity 曲線推導,stdlib) | z13;codex/claude 寫 | 低。純加法,有 SSOT 背書(英文 ROADMAP `Planned-next`) |
-| 補資料邊 | **FinMind** 線上 `BarProvider` → 寫入既有 Parquet cache(fetch-once-then-cache,回測仍離線決定性) | acer/ayaneo on-demand 跑取數 | 低。FinMind 免註冊;license MIT-ish 上線前確認 |
-| 研究 sweep(選用) | 借 **vectorbt** 的 pattern 做參數掃描研究模式 | z13 | ⚠️ 只在單跑回測太慢時才做;**否則 over-build** |
+| 加策略廣度 | 經既有 `StrategyRegistry` 加 **2–3 個參考策略**(動量／突破、均值回歸） | orchestrator node (Win) 編排;codex/claude 寫,codex+agy 對讀審 | 低。seam 已就緒,純加法 |
+| 補風險指標 | 既有 Sharpe/CAGR/vol 之上加 **Sortino / Calmar / 最大回撤期間**(同由 equity 曲線推導,stdlib) | orchestrator node (Win);codex/claude 寫 | 低。純加法,有 SSOT 背書(英文 ROADMAP `Planned-next`) |
+| 補資料邊 | **FinMind** 線上 `BarProvider` → 寫入既有 Parquet cache(fetch-once-then-cache,回測仍離線決定性) | a Windows node on-demand 跑取數 | 低。FinMind 免註冊;license MIT-ish 上線前確認 |
+| 研究 sweep(選用) | 借 **vectorbt** 的 pattern 做參數掃描研究模式 | orchestrator node (Win) | ⚠️ 只在單跑回測太慢時才做;**否則 over-build** |
 
 ### 📅 階段二 — 執行邊（排後,牽涉真錢)
 
 | 目標 | 具體項 | 在哪做 | 風險 / 前置 |
 |---|---|---|---|
-| 接券商 | 實作已宣告的 `Broker` ABC against **Shioaji**(永豐金,台股原生);保留模擬 `PaperBroker` 為**預設** | acer/ayaneo(需 Shioaji 環境）;高風險變更走雙閘 | 中。Shioaji SDK license 上線前須確認 |
+| 接券商 | 實作已宣告的 `Broker` ABC against **Shioaji**(永豐金,台股原生);保留模擬 `PaperBroker` 為**預設** | a Windows node(需 Shioaji 環境）;高風險變更走雙閘 | 中。Shioaji SDK license 上線前須確認 |
 | 真錢路徑 | live 下單走 **governor + 雙閘 + 手機核准**;真錢**預設 OFF**、對稱 off-switch | 操作者決策 + 手機核准 | 🔴 高。真錢=危險區。可稽核產物剛好當 live flight-recorder |
 
 ### 🔭 階段三 — 獨特利基（護城河的兌現)
 
 | 目標 | 具體項 | 在哪做 | 風險 / 前置 |
 |---|---|---|---|
-| agent 橋接 | 開一薄介面:phantom-mesh agent 能(i)請求對某策略/參數做**決定性回測**、(ii)送**受治理的** paper/live 單 | z13 編排 + phantom-mesh 生態 | 前置=階段二的 governor/手機核准底座 |
+| agent 橋接 | 開一薄介面:phantom-mesh agent 能(i)請求對某策略/參數做**決定性回測**、(ii)送**受治理的** paper/live 單 | orchestrator node (Win) 編排 + phantom-mesh 生態 | 前置=階段二的 governor/手機核准底座 |
 | 安全執行層 | 定位:agent 出訊號 → phantom-quant 決定性 paper 驗證 → 受治理 live 執行。**這是別人(TradingAgents/ai-hedge-fund 都只出訊號不執行)填不了的縫** | — | 這就是 phantom-quant 在生態裡**獨特、可防禦**的位置 |
 
 ---

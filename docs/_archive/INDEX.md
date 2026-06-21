@@ -16,4 +16,4 @@ Superseded or dated dev-logs are moved (not deleted) into [`_archive/`](_archive
 
 | Archived doc | Was | Superseded by |
 |--------------|-----|---------------|
-| [_archive/TASK-risk-metrics.z13.md](_archive/TASK-risk-metrics.z13.md) | Task brief for the Sharpe/CAGR/ann-vol work. | Work shipped (`master` @ `ed6a1f1`); status now in [ROADMAP.md](../ROADMAP.md). |
+| [_archive/TASK-risk-metrics.md](_archive/TASK-risk-metrics.md) | Task brief for the Sharpe/CAGR/ann-vol work. | Work shipped (`master` @ `ed6a1f1`); status now in [ROADMAP.md](../ROADMAP.md). |
