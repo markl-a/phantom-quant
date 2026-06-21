@@ -12,3 +12,10 @@ reports/
 /report.md
 .DS_Store
 Thumbs.db
+# loop scratch — never push to public (may carry tailnet IPs / local paths / machine names)
+.ai-shared/
+overnight/
+SESSION_RESUME.md
+cache/
+TASK-*.md
+configs/agents.*.toml
