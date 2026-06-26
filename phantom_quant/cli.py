@@ -9,11 +9,12 @@ extra installed; v1 backtests run entirely offline from --csv.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from decimal import Decimal
 from pathlib import Path
 
-from . import costs, report
+from . import costs, report, risk, tw_scenario
 from .artifacts import RunMeta, write_artifacts
 from .backtest.engine import run_backtest
 from .data.provider import CachedProvider, CsvProvider
@@ -94,6 +95,16 @@ def main(argv: list[str] | None = None) -> int:
                     help="Parquet cache directory; bars for this "
                          "symbol/timeframe/range are fetched once then reused")
     pp.add_argument("--out", required=True, type=Path)
+    pp.add_argument("--artifacts", type=Path, default=None,
+                    help="directory to write auditable paper artifacts "
+                         "(trades.csv, equity.csv, run.json, report.md)")
+    pp.add_argument("--git-sha", default="unknown",
+                    help="git commit stamp recorded in run.json (caller-supplied)")
+    pp.add_argument("--version", default="unknown",
+                    help="version stamp recorded in run.json (caller-supplied)")
+    pp.add_argument("--generated-at", default="",
+                    help="ISO timestamp recorded in run.json (caller-supplied; "
+                         "left blank keeps artifacts byte-stable)")
 
     ic = sub.add_parser("import-csv",
                         help="load a local CSV into the Parquet cache schema")
@@ -103,6 +114,28 @@ def main(argv: list[str] | None = None) -> int:
     ic.add_argument("--start", default="0000-00-00")
     ic.add_argument("--end", default="9999-99-99")
     ic.add_argument("--out", required=True, type=Path)
+
+    rd = sub.add_parser(
+        "risk-demo",
+        help="write an offline risk-metric and strategy-comparison artifact bundle",
+    )
+    rd.add_argument("--csv", required=True, type=Path)
+    rd.add_argument("--symbol", required=True)
+    rd.add_argument("--short", type=int, default=3)
+    rd.add_argument("--long", type=int, default=6)
+    rd.add_argument("--cash", default="1000000")
+    rd.add_argument("--out", required=True, type=Path)
+
+    tw = sub.add_parser(
+        "tw-scenario",
+        help="write a Taiwan-rule and backtest/paper reproducibility scenario bundle",
+    )
+    tw.add_argument("--csv", required=True, type=Path)
+    tw.add_argument("--symbol", required=True)
+    tw.add_argument("--short", type=int, default=3)
+    tw.add_argument("--long", type=int, default=6)
+    tw.add_argument("--cash", default="1000000")
+    tw.add_argument("--out", required=True, type=Path)
 
     args = parser.parse_args(argv)
 
@@ -135,6 +168,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.artifacts is not None:
             meta = RunMeta(
                 symbol=args.symbol, strategy=args.strategy, timeframe=args.timeframe,
+                mode="backtest",
                 start=args.start, end=args.end, cash=str(args.cash),
                 params={"short": args.short, "long": args.long, "qty": args.qty,
                         "slippage_bps": args.slippage_bps},
@@ -168,6 +202,18 @@ def main(argv: list[str] | None = None) -> int:
         md = report.to_markdown(result, {"symbol": args.symbol, "strategy": args.strategy})
         args.out.write_text(md, encoding="utf-8")
         print(f"report written: {args.out}")
+        if args.artifacts is not None:
+            meta = RunMeta(
+                symbol=args.symbol, strategy=args.strategy, timeframe=args.timeframe,
+                mode="paper",
+                start=args.start, end=args.end, cash=str(args.cash),
+                params={"short": args.short, "long": args.long, "qty": args.qty,
+                        "slippage_bps": args.slippage_bps},
+                bar_count=len(bars), git_sha=args.git_sha,
+                version=args.version, generated_at=args.generated_at)
+            paths = write_artifacts(result, meta, args.artifacts)
+            print(f"artifacts written: {args.artifacts} "
+                  f"({', '.join(p.name for p in paths.values())})")
         return 0
 
     if args.cmd == "import-csv":
@@ -178,6 +224,42 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         store.save_bars(bars, args.out)
         print(f"imported {len(bars)} bars for {args.symbol} -> {args.out}")
+        return 0
+
+    if args.cmd == "risk-demo":
+        out_dir = risk.write_risk_demo_bundle(
+            args.csv,
+            args.out,
+            symbol=args.symbol,
+            short=args.short,
+            long=args.long,
+            cash=args.cash,
+        )
+        print(
+            json.dumps(
+                {"out_dir": str(out_dir), "artifacts": risk.PUBLIC_ARTIFACTS},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+
+    if args.cmd == "tw-scenario":
+        out_dir = tw_scenario.write_tw_scenario_bundle(
+            csv_path=args.csv,
+            out_dir=args.out,
+            symbol=args.symbol,
+            short=args.short,
+            long=args.long,
+            cash=args.cash,
+        )
+        print(
+            json.dumps(
+                {"out_dir": str(out_dir), "artifacts": tw_scenario.PUBLIC_ARTIFACTS},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0
     return 1
 

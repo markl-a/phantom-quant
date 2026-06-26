@@ -1,16 +1,20 @@
 {
   "meta": {
     "bar_count": 25,
+    "broker": "disabled",
     "cash": "1000000",
     "cost_model": "tw_stock",
+    "data_source": "csv_fixture",
     "end": "",
     "generated_at": "2026-01-01T00:00:00Z",
     "git_sha": "GOLDEN_SHA",
+    "mode": "backtest",
     "params": {
       "long": 6,
       "qty": 1000,
       "short": 3
     },
+    "schema_version": 1,
     "start": "",
     "strategy": "sma_cross",
     "symbol": "2330",

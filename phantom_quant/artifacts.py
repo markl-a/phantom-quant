@@ -29,6 +29,8 @@ __all__ = ["RunMeta", "to_run_payload", "write_artifacts"]
 class RunMeta:
     symbol: str
     strategy: str
+    schema_version: int = 1
+    mode: str = "backtest"
     timeframe: str = "1d"
     start: str = ""
     end: str = ""
@@ -39,6 +41,8 @@ class RunMeta:
     git_sha: str = "unknown"
     version: str = "unknown"
     generated_at: str = ""
+    data_source: str = "csv_fixture"
+    broker: str = "disabled"
 
 
 def _decimal_to_str(value):
