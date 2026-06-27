@@ -14,7 +14,7 @@ from phantom_quant import costs
 
 
 def _bars(symbol, rows):
-    return [Bar(ts, symbol, o, h, l, c, v) for (ts, o, h, l, c, v) in rows]
+    return [Bar(ts, symbol, o, h, low, c, v) for (ts, o, h, low, c, v) in rows]
 
 
 class _Scripted(Strategy):

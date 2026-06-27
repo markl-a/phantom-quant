@@ -14,7 +14,62 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m pip install -e ".[test]"
+      - run: python -m pip install -e ".[dev]"
+      - name: build wheel
+        run: python -m pip wheel . --no-deps -w /tmp/phantom-quant-wheel
+      - name: lint
+        run: python -m ruff check .
       - run: python -m pytest -q
+      - name: deterministic public smoke
+        run: |
+          export ROOT="$(mktemp -d)"
+          python -m phantom_quant.cli --help
+          python -m phantom_quant.cli backtest \
+            --csv tests/fixtures/sample_2330_1d.csv \
+            --strategy sma_cross --symbol 2330 --short 3 --long 6 --cash 1000000 \
+            --git-sha DEMO --version 0.1.0a0 --generated-at 2026-06-26T00:00:00Z \
+            --artifacts "$ROOT/backtest-artifacts" \
+            --out "$ROOT/backtest.md"
+          python -m phantom_quant.cli paper \
+            --csv tests/fixtures/sample_2330_1d.csv \
+            --strategy sma_cross --symbol 2330 --short 3 --long 6 --cash 1000000 \
+            --git-sha DEMO --version 0.1.0a0 --generated-at 2026-06-26T00:00:00Z \
+            --artifacts "$ROOT/paper-artifacts" \
+            --out "$ROOT/paper.md"
+          python -m phantom_quant.cli risk-demo \
+            --csv tests/fixtures/sample_2330_1d.csv \
+            --symbol 2330 --short 3 --long 6 --cash 1000000 \
+            --out "$ROOT/risk-demo"
+          python -m phantom_quant.cli tw-scenario \
+            --csv tests/fixtures/sample_2330_1d.csv \
+            --symbol 2330 --short 3 --long 6 --cash 1000000 \
+            --out "$ROOT/tw-scenario"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["ROOT"])
+          backtest_run = json.loads((root / "backtest-artifacts" / "run.json").read_text(encoding="utf-8"))
+          paper_run = json.loads((root / "paper-artifacts" / "run.json").read_text(encoding="utf-8"))
+          risk_manifest = json.loads((root / "risk-demo" / "manifest.json").read_text(encoding="utf-8"))
+          tw_manifest = json.loads((root / "tw-scenario" / "manifest.json").read_text(encoding="utf-8"))
+          parity = json.loads((root / "tw-scenario" / "parity.json").read_text(encoding="utf-8"))
+
+          assert backtest_run["meta"]["schema_version"] == 1
+          assert paper_run["meta"]["schema_version"] == 1
+          assert backtest_run["meta"]["broker"] == "disabled"
+          assert paper_run["meta"]["broker"] == "disabled"
+          for manifest in (risk_manifest, tw_manifest):
+              assert manifest["schema_version"] == 1
+              assert manifest["broker"] == "disabled"
+              assert manifest["live_broker_execution"] is False
+              assert manifest["real_money"] is False
+              assert manifest["investment_advice"] is False
+              assert manifest["external_network"] is False
+          assert parity["parity"]["trades_match"] is True
+          assert parity["parity"]["equity_match"] is True
+          assert parity["parity"]["metrics_match"] is True
+          PY
       - name: release-prep gate
         run: python -m pytest tests/test_release_prep_contract.py -q

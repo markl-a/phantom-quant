@@ -2,7 +2,7 @@
 
 Status: release candidate approved and tagged.
 
-Date: 2026-06-26
+Date: 2026-06-27
 
 ## Scope
 
@@ -25,6 +25,19 @@ Result: `high_conf_secret_hits=0`.
 - Optional broker dependency `shioaji>=1` is not part of the default offline release path and requires separate broker/live-trading approval before use.
 
 Direct default release-scope dependency/license review result: pass.
+
+## Current Verification Evidence
+
+- `python -m pip install -e . --dry-run --no-deps`: passed; would install `phantom-quant-0.1.0a0`.
+- `python -m pip wheel . --no-deps -w <temp>`: passed; built `phantom_quant-0.1.0a0-py3-none-any.whl`.
+- `python -m phantom_quant.cli --help`: passed.
+- Deterministic public smoke path: passed for `backtest`, `paper`, `risk-demo`, and `tw-scenario`; manifests and run metadata record `broker=disabled`, `live_broker_execution=false`, `real_money=false`, `investment_advice=false`, and `external_network=false` where applicable.
+- `python -m ruff check .`: passed; all checks passed.
+- `python -m pytest -q`: passed; 147 tests passed.
+- Root `python .\run_phantom_satellite_usage_smoke.py`: passed; 10/10 projects OK.
+- Root `python .\run_phantom_agent_compat_smoke.py`: passed; 40/40 invocations OK.
+- Root `python -m pytest .\tests -q`: passed; 85 tests passed.
+- High-confidence secret scan: `high_conf_secret_hits=0`.
 
 ## Remaining Publication Gates
 

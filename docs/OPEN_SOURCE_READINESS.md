@@ -157,3 +157,25 @@ Evidence:
 - `python -m pytest -q`: 144 passed.
 
 Remaining P4 work: none for the approved release-candidate tag.
+
+## P4 Release-Prep Slice 5
+
+Status: current release-candidate verification refreshed for package metadata, CI, wheel, lint, deterministic public smoke, and secret scan.
+
+Evidence:
+- `pyproject.toml` declares Apache-2.0 metadata, author metadata, Python classifiers, project URLs, and `test`/`dev` extras.
+- `.github/workflows/ci.yml` installs `.[dev]`, builds a wheel, runs `ruff`, runs the full test suite, runs deterministic public smoke commands, and runs the release-prep gate.
+- `tests/test_packaging.py` verifies package metadata, default dependency surface, optional broker extra, and the `phantom-quant` CLI entrypoint target.
+- `tests/test_release_prep_contract.py` verifies CI release gates and current audit evidence.
+- `python -m pip install -e . --dry-run --no-deps`: passed; would install `phantom-quant-0.1.0a0`.
+- `python -m pip wheel . --no-deps -w <temp>`: passed; built `phantom_quant-0.1.0a0-py3-none-any.whl`.
+- `python -m phantom_quant.cli --help`: passed.
+- Deterministic public smoke path: passed for `backtest`, `paper`, `risk-demo`, and `tw-scenario`; manifests and run metadata record offline/no-broker/no-real-money/no-advice/no-network boundaries.
+- `python -m ruff check .`: passed; all checks passed.
+- `python -m pytest -q`: passed; 147 tests passed.
+- Root `python .\run_phantom_satellite_usage_smoke.py`: passed; 10/10 projects OK.
+- Root `python .\run_phantom_agent_compat_smoke.py`: passed; 40/40 invocations OK.
+- Root `python -m pytest .\tests -q`: passed; 85 tests passed.
+- High-confidence secret scan: `high_conf_secret_hits=0`.
+
+Remaining P4 work: none for this public source release candidate.

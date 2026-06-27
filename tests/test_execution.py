@@ -7,19 +7,17 @@ fixture price series so the assertions are independently re-computable.
 """
 from decimal import Decimal
 
-import pytest
-
+from phantom_quant import costs
 from phantom_quant.bars import Bar
 from phantom_quant.backtest.engine import run_backtest, FillStatus
-from phantom_quant.strategy import Context, Order, Strategy
-from phantom_quant import costs
+from phantom_quant.strategy import Order, Strategy
 
 
 # --- deterministic fixtures -------------------------------------------------
 
 def _bars(rows):
     """rows: list of (ts, open, high, low, close, volume)."""
-    return [Bar(ts, "2330", o, h, l, c, v) for (ts, o, h, l, c, v) in rows]
+    return [Bar(ts, "2330", o, h, low, c, v) for (ts, o, h, low, c, v) in rows]
 
 
 class _ScriptedStrategy(Strategy):

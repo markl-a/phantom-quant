@@ -12,8 +12,8 @@ from phantom_quant.limit_lock import (
 )
 
 
-def _bar(o, h, l, c):
-    return Bar(ts="t", symbol="X", open=o, high=h, low=l, close=c, volume=1)
+def _bar(o, h, low, c):
+    return Bar(ts="t", symbol="X", open=o, high=h, low=low, close=c, volume=1)
 
 
 def test_limit_band_is_plus_minus_10_percent():

@@ -149,7 +149,10 @@ def metrics(result: BacktestResult, *, risk_free: float = 0.0, periods_per_year:
 
 def to_markdown(result: BacktestResult, meta: dict) -> str:
     m = metrics(result)
-    pct = lambda d: f"{(d * 100):.2f}%"
+
+    def pct(d: Decimal | float) -> str:
+        return f"{(d * 100):.2f}%"
+
     lines = [
         "# phantom-quant backtest",
         "",
